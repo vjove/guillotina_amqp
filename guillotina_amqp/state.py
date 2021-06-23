@@ -269,6 +269,7 @@ class RedisStateManager:
             # returns 1 if the key was set (another worker took the task and is locked?)
             # returns 0 if the key wasn't set (already existed)
             logger.warning(f"Task {self.task_id}: acquire setnx returned {resp}")
+            print(f"Task {self.task_id}: acquire setnx returned {resp}")
             # if resp == 1:
             #   raise TaskAlreadyAcquired(task_id)
         if not resp:
