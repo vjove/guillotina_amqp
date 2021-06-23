@@ -286,9 +286,6 @@ class RedisStateManager:
         return task_owner_id.decode() == self.worker_id
 
     async def release(self, task_id):
-        if not await self.is_locked(task_id):
-            # There is no lock, nothing to do
-            return False
         if not await self.is_mine(task_id):
             # You can't release a task for which you don't own a lock
             raise TaskAccessUnauthorized
