@@ -256,37 +256,20 @@ class RedisStateManager:
 
     async def acquire(self, task_id: str, ttl: int) -> None:
 
-        # Note: this is not multi-worker safe
-        # since another worker could acquire the lock between
-        # the is_locked check and the call to setnx below
-        if await self.is_locked(task_id):
-            raise TaskAlreadyAcquired(task_id)
-
         # Set the lock
         cache = await self.get_cache()
         with watch_redis("setnx"):
             resp = await cache.setnx(self.lock_prefix(task_id), self.worker_id)
-            # returns 1 if the key was set (another worker took the task and is locked?)
-            # returns 0 if the key wasn't set (already existed)
-            logger.warning(f"Task {self.task_id}: acquire setnx returned {resp}")
-            print(f"Task {self.task_id}: acquire setnx returned {resp}")
-            # if resp == 1:
-            #   raise TaskAlreadyAcquired(task_id)
         if not resp:
-            raise Exception(f"Error acquiring {task_id}")
+            raise TaskAlreadyAcquired(task_id)
 
-        # Need to set an expiration for the lock in redis at creation
-        # time
-        refreshed = await self.refresh_lock(task_id, ttl)
-        return refreshed
-
-        # for performance, this could be replaced with:
-        # this would save calling is_locked and is_mine
-        # which we know to be true when we just acquired the lock
+        # instead of calling refresh_lock, we set expiration
+        # directly to save calling is_locked and is_mine,
+        # which we know to be true because we just acquired the lock
         # in this same function
-        #with watch_redis("expire"):
-        #    resp = await cache.expire(self.lock_prefix(task_id), ttl)
-        #return resp > 0
+        with watch_redis("expire"):
+            resp = await cache.expire(self.lock_prefix(task_id), ttl)
+        return resp > 0
 
     async def is_locked(self, task_id):
         cache = await self.get_cache()
